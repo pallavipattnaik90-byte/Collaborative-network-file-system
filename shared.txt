@@ -1,0 +1,4 @@
+Welcome to the Collaborative Network File System.
+
+This file is maintained by the server.
+
