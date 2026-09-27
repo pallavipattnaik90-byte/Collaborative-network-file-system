@@ -6,20 +6,30 @@ PORT = 5000
 
 FILE_PATH = "shared/shared.txt"
 
-
 def handle_client(conn, addr):
     print("Client connected:", addr)
 
-    request = conn.recv(1024).decode()
+    data = conn.recv(4096).decode()
 
-    if request == "GET_FILE":
+    if "\n" in data:
+        request, content = data.split("\n", 1)
+    else:
+        request = data
+        content = ""
+
+    if request == "EDIT_FILE":
+        with open(FILE_PATH, "w") as file:
+            file.write(content)
+
+        conn.sendall(b"File updated successfully.")
+
+    elif request == "GET_FILE":
         with open(FILE_PATH, "r") as file:
             content = file.read()
 
         conn.sendall(content.encode())
 
     conn.close()
-
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
