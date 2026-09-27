@@ -9,8 +9,9 @@ client.connect((HOST, PORT))
 print("Enter new content for the shared file:")
 content = input()
 
-client.sendall(b"EDIT_FILE")
-client.sendall(content.encode())
+message = "EDIT_FILE\n" + content
+
+client.sendall(message.encode())
 
 response = client.recv(1024)
 
