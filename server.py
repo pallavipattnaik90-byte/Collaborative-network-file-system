@@ -11,19 +11,15 @@ def handle_client(conn, addr):
 
     data = conn.recv(4096).decode()
 
-    if "\n" in data:
-        request, content = data.split("\n", 1)
-    else:
-        request = data
-        content = ""
+    if data.startswith("EDIT_FILE\n"):
+        content = data.split("\n", 1)[1]
 
-    if request == "EDIT_FILE":
         with open(FILE_PATH, "w") as file:
             file.write(content)
 
         conn.sendall(b"File updated successfully.")
 
-    elif request == "GET_FILE":
+    elif data == "GET_FILE":
         with open(FILE_PATH, "r") as file:
             content = file.read()
 
