@@ -3,18 +3,34 @@ import socket
 HOST = "127.0.0.1"
 PORT = 5000
 
+print("1. View shared file")
+print("2. Edit shared file")
+
+choice = input("Enter choice: ")
+
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((HOST, PORT))
 
-print("Enter new content for the shared file:")
-content = input()
+if choice == "1":
+    client.sendall(b"GET_FILE")
 
-message = "EDIT_FILE\n" + content
+    data = client.recv(4096)
 
-client.sendall(message.encode())
+    print("\nShared file:")
+    print(data.decode())
 
-response = client.recv(1024)
+elif choice == "2":
+    print("Enter new content for the shared file:")
+    content = input()
 
-print("Server:", response.decode())
+    message = "EDIT_FILE\n" + content
+    client.sendall(message.encode())
+
+    response = client.recv(1024)
+
+    print("Server:", response.decode())
+
+else:
+    print("Invalid choice")
 
 client.close()
