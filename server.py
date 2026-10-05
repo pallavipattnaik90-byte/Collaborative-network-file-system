@@ -10,16 +10,24 @@ def handle_client(conn, addr):
     print("Client connected:", addr)
 
     data = conn.recv(4096).decode()
+    parts = data.split("\n", 2)
 
-    if data.startswith("EDIT_FILE\n"):
-        content = data.split("\n", 1)[1]
+    command = parts[0]
+    client_name = parts[1]
+
+    print("Client:", client_name)
+
+    if command == "EDIT_FILE":
+        content = parts[2]
 
         with open(FILE_PATH, "w") as file:
             file.write(content)
 
+        print(client_name, "edited the shared file.")
+
         conn.sendall(b"File updated successfully.")
 
-    elif data == "GET_FILE":
+    elif command == "GET_FILE":
         with open(FILE_PATH, "r") as file:
             content = file.read()
 
