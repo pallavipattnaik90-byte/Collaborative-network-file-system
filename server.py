@@ -6,6 +6,8 @@ PORT = 5000
 
 FILE_PATH = "shared/shared.txt"
 
+file_lock = threading.Lock()
+
 def handle_client(conn, addr):
     print("Client connected:", addr)
 
@@ -20,16 +22,20 @@ def handle_client(conn, addr):
     if command == "EDIT_FILE":
         content = parts[2]
 
-        with open(FILE_PATH, "w") as file:
-            file.write(content)
+        with file_lock:
+            print(client_name, "is editing the file.")
 
-        print(client_name, "edited the shared file.")
+            with open(FILE_PATH, "w") as file:
+                file.write(content)
+
+        print(client_name, "finished editing.")
 
         conn.sendall(b"File updated successfully.")
 
     elif command == "GET_FILE":
-        with open(FILE_PATH, "r") as file:
-            content = file.read()
+        with file_lock:
+            with open(FILE_PATH, "r") as file:
+                content = file.read()
 
         conn.sendall(content.encode())
 
