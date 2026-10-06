@@ -5,34 +5,45 @@ PORT = 5000
 
 client_name = input("Enter client name: ")
 
-print("\n1. View shared file")
-print("2. Edit shared file")
-
-choice = input("Enter choice: ")
-
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 client.connect((HOST, PORT))
 
-if choice == "1":
-    client.sendall(("GET_FILE\n" + client_name).encode())
+while True:
 
-    data = client.recv(4096)
+    print("\n1. View shared file")
+    print("2. Edit shared file")
+    print("3. Exit")
 
-    print("\nShared file:")
-    print(data.decode())
+    choice = input("Enter choice: ")
 
-elif choice == "2":
-    print("Enter new content for the shared file:")
-    content = input()
+    if choice == "1":
 
-    message = "EDIT_FILE\n" + client_name + "\n" + content
-    client.sendall(message.encode())
+        client.sendall(("GET_FILE\n" + client_name).encode())
 
-    response = client.recv(1024)
+        data = client.recv(4096)
 
-    print("Server:", response.decode())
+        print("\nShared file:")
+        print(data.decode())
 
-else:
-    print("Invalid choice")
+    elif choice == "2":
 
-client.close()
+        print("Enter new content:")
+        content = input()
+
+        message = "EDIT_FILE\n" + client_name + "\n" + content
+
+        client.sendall(message.encode())
+
+        response = client.recv(1024)
+
+        print("Server:", response.decode())
+
+    elif choice == "3":
+
+        client.close()
+        print("Disconnected from server.")
+        break
+
+    else:
+
+        print("Invalid choice")
