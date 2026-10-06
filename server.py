@@ -8,40 +8,59 @@ FILE_PATH = "shared/shared.txt"
 
 file_lock = threading.Lock()
 
+
 def handle_client(conn, addr):
     print("Client connected:", addr)
 
-    data = conn.recv(4096).decode()
-    parts = data.split("\n", 2)
+    while True:
+        data = conn.recv(4096)
 
-    command = parts[0]
-    client_name = parts[1]
+        if not data:
+            print("Client disconnected:", addr)
+            break
 
-    print("Client:", client_name)
+        data = data.decode()
 
-    if command == "EDIT_FILE":
-        content = parts[2]
+        parts = data.split("\n", 2)
 
-        with file_lock:
-            print(client_name, "is editing the file.")
+        if len(parts) < 2:
+            continue
 
-            with open(FILE_PATH, "w") as file:
-                file.write(content)
+        command = parts[0]
+        client_name = parts[1]
 
-        print(client_name, "finished editing.")
+        print("Client:", client_name)
 
-        conn.sendall(b"File updated successfully.")
+        if command == "GET_FILE":
 
-    elif command == "GET_FILE":
-        with file_lock:
-            with open(FILE_PATH, "r") as file:
-                content = file.read()
+            with file_lock:
+                with open(FILE_PATH, "r") as file:
+                    content = file.read()
 
-        conn.sendall(content.encode())
+            conn.sendall(content.encode())
+
+        elif command == "EDIT_FILE":
+
+            if len(parts) < 3:
+                continue
+
+            content = parts[2]
+
+            with file_lock:
+                print(client_name, "is editing the file.")
+
+                with open(FILE_PATH, "w") as file:
+                    file.write(content)
+
+            print(client_name, "finished editing.")
+
+            conn.sendall(b"File updated successfully.")
 
     conn.close()
 
+
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 server.bind((HOST, PORT))
