@@ -8,8 +8,7 @@ PORT = 5000
 
 def send_message(sock, message):
     data = json.dumps(message).encode()
-    header = struct.pack("!I", len(data))
-    sock.sendall(header + data)
+    sock.sendall(struct.pack("!I", len(data)) + data)
 
 
 def receive_message(sock):
@@ -36,6 +35,8 @@ def receive_message(sock):
 client_name = input("Enter client name: ")
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+last_viewed_version = None
+
 try:
     client.connect((HOST, PORT))
     print("Connected to server.")
@@ -58,25 +59,41 @@ try:
             if response.get("status") == "OK":
                 print("\nShared file:")
                 print(response.get("content", ""))
-                print("File version:", response.get("version"))
+
+                last_viewed_version = response.get("version")
+                print("File version:", last_viewed_version)
             else:
                 print("Error:", response.get("message"))
 
         elif choice == "2":
+            if last_viewed_version is None:
+                print("Please view the shared file before editing.")
+                continue
+
             content = input("Enter new content: ")
 
             send_message(client, {
                 "command": "EDIT_FILE",
                 "client_name": client_name,
-                "content": content
+                "content": content,
+                "expected_version": last_viewed_version
             })
 
             response = receive_message(client)
 
-            print("Server:", response.get("message", ""))
-
             if response.get("status") == "OK":
-                print("File version:", response.get("version"))
+                last_viewed_version = response.get("version")
+                print("Server:", response.get("message"))
+                print("File version:", last_viewed_version)
+
+            elif response.get("status") == "CONFLICT":
+                print("\nCONFLICT DETECTED!")
+                print(response.get("message"))
+                print("Latest version:", response.get("version"))
+                print("Choose option 1 to view the latest file before editing again.")
+
+            else:
+                print("Error:", response.get("message"))
 
         elif choice == "3":
             break
@@ -84,7 +101,7 @@ try:
         else:
             print("Invalid choice.")
 
-except (ConnectionError, OSError, json.JSONDecodeError) as error:
+except (ConnectionError, OSError, ValueError, json.JSONDecodeError) as error:
     print("Error:", error)
 
 finally:
