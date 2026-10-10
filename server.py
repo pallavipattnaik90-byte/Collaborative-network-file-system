@@ -1,3 +1,4 @@
+
 import socket
 import threading
 import json
@@ -35,8 +36,7 @@ def receive_message(conn):
 
 def send_message(conn, message):
     data = json.dumps(message).encode()
-    header = struct.pack("!I", len(data))
-    conn.sendall(header + data)
+    conn.sendall(struct.pack("!I", len(data)) + data)
 
 
 def handle_client(conn, addr):
@@ -54,38 +54,46 @@ def handle_client(conn, addr):
             command = request.get("command")
             client_name = request.get("client_name", "Unknown")
 
-            print("Client:", client_name)
-
             if command == "GET_FILE":
                 with file_lock:
                     with open(FILE_PATH, "r") as file:
                         content = file.read()
 
-                    current_version = file_version
+                    version = file_version
 
                 send_message(conn, {
                     "status": "OK",
                     "content": content,
-                    "version": current_version
+                    "version": version
                 })
+
+                print(client_name, "viewed version", version)
 
             elif command == "EDIT_FILE":
                 content = request.get("content", "")
+                expected_version = request.get("expected_version")
 
                 with file_lock:
+                    if expected_version != file_version:
+                        send_message(conn, {
+                            "status": "CONFLICT",
+                            "message": "Conflict detected! The file has changed. View the latest version before editing.",
+                            "version": file_version
+                        })
+                        continue
+
                     with open(FILE_PATH, "w") as file:
                         file.write(content)
 
                     file_version += 1
-                    current_version = file_version
+                    version = file_version
 
-                print(client_name, "updated the file.")
-                print("Current file version:", current_version)
+                print(client_name, "updated the file to version", version)
 
                 send_message(conn, {
                     "status": "OK",
                     "message": "File updated successfully.",
-                    "version": current_version
+                    "version": version
                 })
 
             else:
