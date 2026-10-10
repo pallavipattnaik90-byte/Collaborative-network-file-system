@@ -7,7 +7,9 @@ HOST = "127.0.0.1"
 PORT = 5000
 
 FILE_PATH = "shared/shared.txt"
+
 file_lock = threading.Lock()
+file_version = 1
 
 
 def receive_message(conn):
@@ -38,6 +40,8 @@ def send_message(conn, message):
 
 
 def handle_client(conn, addr):
+    global file_version
+
     print("Client connected:", addr)
 
     try:
@@ -57,7 +61,13 @@ def handle_client(conn, addr):
                     with open(FILE_PATH, "r") as file:
                         content = file.read()
 
-                send_message(conn, {"status": "OK", "content": content})
+                    current_version = file_version
+
+                send_message(conn, {
+                    "status": "OK",
+                    "content": content,
+                    "version": current_version
+                })
 
             elif command == "EDIT_FILE":
                 content = request.get("content", "")
@@ -66,10 +76,16 @@ def handle_client(conn, addr):
                     with open(FILE_PATH, "w") as file:
                         file.write(content)
 
-                print(client_name, "updated the shared file.")
+                    file_version += 1
+                    current_version = file_version
+
+                print(client_name, "updated the file.")
+                print("Current file version:", current_version)
+
                 send_message(conn, {
                     "status": "OK",
-                    "message": "File updated successfully."
+                    "message": "File updated successfully.",
+                    "version": current_version
                 })
 
             else:
@@ -96,6 +112,7 @@ print("Waiting for clients...")
 
 while True:
     conn, addr = server.accept()
+
     threading.Thread(
         target=handle_client,
         args=(conn, addr),
