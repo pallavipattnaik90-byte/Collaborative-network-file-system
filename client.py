@@ -1,49 +1,87 @@
 import socket
+import json
+import struct
 
 HOST = "127.0.0.1"
 PORT = 5000
 
+
+def send_message(sock, message):
+    data = json.dumps(message).encode()
+    header = struct.pack("!I", len(data))
+    sock.sendall(header + data)
+
+
+def receive_message(sock):
+    header = b""
+
+    while len(header) < 4:
+        chunk = sock.recv(4 - len(header))
+        if not chunk:
+            raise ConnectionError("Server disconnected")
+        header += chunk
+
+    length = struct.unpack("!I", header)[0]
+    data = b""
+
+    while len(data) < length:
+        chunk = sock.recv(length - len(data))
+        if not chunk:
+            raise ConnectionError("Server disconnected")
+        data += chunk
+
+    return json.loads(data.decode())
+
+
 client_name = input("Enter client name: ")
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client.connect((HOST, PORT))
 
-while True:
+try:
+    client.connect((HOST, PORT))
+    print("Connected to server.")
 
-    print("\n1. View shared file")
-    print("2. Edit shared file")
-    print("3. Exit")
+    while True:
+        print("\n1. View shared file")
+        print("2. Edit shared file")
+        print("3. Exit")
 
-    choice = input("Enter choice: ")
+        choice = input("Enter choice: ")
 
-    if choice == "1":
+        if choice == "1":
+            send_message(client, {
+                "command": "GET_FILE",
+                "client_name": client_name
+            })
 
-        client.sendall(("GET_FILE\n" + client_name).encode())
+            response = receive_message(client)
 
-        data = client.recv(4096)
+            print("\nShared file:")
+            print(response.get("content", response.get("message", "")))
 
-        print("\nShared file:")
-        print(data.decode())
+        elif choice == "2":
+            print("Enter new content:")
+            content = input()
 
-    elif choice == "2":
+            send_message(client, {
+                "command": "EDIT_FILE",
+                "client_name": client_name,
+                "content": content
+            })
 
-        print("Enter new content:")
-        content = input()
+            response = receive_message(client)
+            print("Server:", response.get("message", ""))
 
-        message = "EDIT_FILE\n" + client_name + "\n" + content
+        elif choice == "3":
+            print("Disconnecting...")
+            break
 
-        client.sendall(message.encode())
+        else:
+            print("Invalid choice.")
 
-        response = client.recv(1024)
+except (ConnectionError, OSError, json.JSONDecodeError) as error:
+    print("Error:", error)
 
-        print("Server:", response.decode())
-
-    elif choice == "3":
-
-        client.close()
-        print("Disconnected from server.")
-        break
-
-    else:
-
-        print("Invalid choice")
+finally:
+    client.close()
+    print("Disconnected from server.")
