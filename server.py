@@ -1,68 +1,93 @@
 import socket
 import threading
+import json
+import struct
 
 HOST = "127.0.0.1"
 PORT = 5000
 
 FILE_PATH = "shared/shared.txt"
-
 file_lock = threading.Lock()
+
+
+def receive_message(conn):
+    header = b""
+
+    while len(header) < 4:
+        chunk = conn.recv(4 - len(header))
+        if not chunk:
+            return None
+        header += chunk
+
+    length = struct.unpack("!I", header)[0]
+    data = b""
+
+    while len(data) < length:
+        chunk = conn.recv(length - len(data))
+        if not chunk:
+            return None
+        data += chunk
+
+    return json.loads(data.decode())
+
+
+def send_message(conn, message):
+    data = json.dumps(message).encode()
+    header = struct.pack("!I", len(data))
+    conn.sendall(header + data)
 
 
 def handle_client(conn, addr):
     print("Client connected:", addr)
 
-    while True:
-        data = conn.recv(4096)
+    try:
+        while True:
+            request = receive_message(conn)
 
-        if not data:
-            print("Client disconnected:", addr)
-            break
+            if request is None:
+                break
 
-        data = data.decode()
+            command = request.get("command")
+            client_name = request.get("client_name", "Unknown")
 
-        parts = data.split("\n", 2)
+            print("Client:", client_name)
 
-        if len(parts) < 2:
-            continue
+            if command == "GET_FILE":
+                with file_lock:
+                    with open(FILE_PATH, "r") as file:
+                        content = file.read()
 
-        command = parts[0]
-        client_name = parts[1]
+                send_message(conn, {"status": "OK", "content": content})
 
-        print("Client:", client_name)
+            elif command == "EDIT_FILE":
+                content = request.get("content", "")
 
-        if command == "GET_FILE":
+                with file_lock:
+                    with open(FILE_PATH, "w") as file:
+                        file.write(content)
 
-            with file_lock:
-                with open(FILE_PATH, "r") as file:
-                    content = file.read()
+                print(client_name, "updated the shared file.")
+                send_message(conn, {
+                    "status": "OK",
+                    "message": "File updated successfully."
+                })
 
-            conn.sendall(content.encode())
+            else:
+                send_message(conn, {
+                    "status": "ERROR",
+                    "message": "Unknown command."
+                })
 
-        elif command == "EDIT_FILE":
+    except (ConnectionError, OSError, ValueError, json.JSONDecodeError) as error:
+        print("Connection error:", error)
 
-            if len(parts) < 3:
-                continue
-
-            content = parts[2]
-
-            with file_lock:
-                print(client_name, "is editing the file.")
-
-                with open(FILE_PATH, "w") as file:
-                    file.write(content)
-
-            print(client_name, "finished editing.")
-
-            conn.sendall(b"File updated successfully.")
-
-    conn.close()
+    finally:
+        conn.close()
+        print("Client disconnected:", addr)
 
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
 server.bind((HOST, PORT))
 server.listen()
 
@@ -71,10 +96,8 @@ print("Waiting for clients...")
 
 while True:
     conn, addr = server.accept()
-
-    thread = threading.Thread(
+    threading.Thread(
         target=handle_client,
-        args=(conn, addr)
-    )
-
-    thread.start()
+        args=(conn, addr),
+        daemon=True
+    ).start()
