@@ -34,7 +34,6 @@ def receive_message(sock):
 
 
 client_name = input("Enter client name: ")
-
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 try:
@@ -56,12 +55,15 @@ try:
 
             response = receive_message(client)
 
-            print("\nShared file:")
-            print(response.get("content", response.get("message", "")))
+            if response.get("status") == "OK":
+                print("\nShared file:")
+                print(response.get("content", ""))
+                print("File version:", response.get("version"))
+            else:
+                print("Error:", response.get("message"))
 
         elif choice == "2":
-            print("Enter new content:")
-            content = input()
+            content = input("Enter new content: ")
 
             send_message(client, {
                 "command": "EDIT_FILE",
@@ -70,10 +72,13 @@ try:
             })
 
             response = receive_message(client)
+
             print("Server:", response.get("message", ""))
 
+            if response.get("status") == "OK":
+                print("File version:", response.get("version"))
+
         elif choice == "3":
-            print("Disconnecting...")
             break
 
         else:
